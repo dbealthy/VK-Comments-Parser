@@ -9,6 +9,7 @@ from db import DataBase
 
 NOPARENT = None
 INSERTION_COUNT = 50
+VK_BASE_URL = "https://vk.com"
 
 def main():
     global tools, vk
@@ -23,45 +24,50 @@ def main():
         return
 
     with DataBase(dbconfig) as db:
-        posts = db.query('SELECT * FROM posts')
-        comments_stack = set()
-        authors_stack = set()
-        author_ids = ''
+        posts = db.get_posts()
+        comments_stack = list()
+        met_author_ids = set()
 
-        for row in posts:
-            p_id, p_url = row
+        for post in posts:
+            p_id, p_url = post
             owner_id, post_id = extract_post_id(p_url)
-            existing_comments = [c[2] for c in db.query('SELECT * FROM comments WHERE P_ID=%s', (p_id,))]
+            existing_comments = [c[3] for c in db.query('SELECT * FROM comments WHERE P_ID=%s', (p_id,))]
             print(f"Parsing: {p_url}")
 
             for c in get_all_comments(owner_id, post_id):
-                # print(c['id'])
                 if not c or c['id'] in existing_comments:
                     continue
                 
-                
-                author_user_id = extract_id_from_url(c['from_link'])
-                author_ids += author_user_id + ','
+                met_author_ids.add(c['from_id'])
+                comments_stack.append(c)
 
-            
-            
-            result = db.save_authors(get_authors_info(author_ids))
-            print(result)
-                # a_id = db.get_author(author_user_id)
+                if len(comments_stack) >= INSERTION_COUNT:
+                    met_author_ids_str = ','.join(map(str, met_author_ids))
+                    existing_author_ids = set([x[0] for x in db.get_author_user_ids([met_author_ids_str,])])
+                    new_author_user_ids = met_author_ids - existing_author_ids
+    
+                    if new_author_user_ids:
+                        new_authors = get_authors_info(','.join(map(str, new_author_user_ids)))
+                        db.save_authors(new_authors)
 
-                # if not a_id:
-                #     author_ids += author_user_id + ','
+                    authors = db.get_author_ids([met_author_ids_str,])
+                    for com in comments_stack:
+                        try:
+                            com['a_id'] = [a for a in authors if a[1] == com['from_id']][0][0]
+                            com['p_id'] = p_id
+                        except:
+                            # Group because of negative user_id
+                            # TODO Either add group table or adapt authors table for groups
+                            com['a_id'] = 1
+                            com['p_id'] = p_id
+                            continue
 
-                # c['p_id'] = p_id
-                # c['a_id'] = a_id
-                # set.add(c)
+                         
 
-                # if len(comments_stack) >= INSERTION_COUNT:
-                #     authors = get_authors_info(author_ids)
-                #     db.save_authors(authors)
-
-                #     db.save_comments(list(comments_stack))
-                #     comments_stack.clear()
+                    # print(comments_stack)
+                    db.save_comments(comments_stack)
+                    comments_stack.clear()
+                    met_author_ids.clear()
 
 
 def get_authors_info(author_ids):
@@ -89,9 +95,10 @@ def get_all_comments(owner_id, post_id):
         for jthread in thread_items:
             yield serialize_comment(jthread, parent=jcomment['id'])
             
+
 def serialize_author(jauthor):
     link = compose_url_from_id(jauthor['id'])
-    screen_name = jauthor.get('screen_name')
+    screen_name = jauthor.get('screen_name', " ---")
     sex = ('Ж' if jauthor['sex'] == 1 else 'М') if jauthor.get('sex') else None
     bdate = jauthor.get('bdate')
     try:
@@ -99,7 +106,7 @@ def serialize_author(jauthor):
     except:
         bdate_formated = datetime.strptime(bdate, '%d.%m').strftime('0000-%m-%d') if bdate else None
     country = jauthor['country']['title'] if jauthor.get('country') else ''
-    city = jauthor['city']['title'] if jauthor.get('title') else ''
+    city = jauthor['city']['title'] if jauthor.get('city') else ''
     location = f"{country} {city}"
     photo_link = jauthor['photo_max_orig']
     return {
@@ -123,7 +130,7 @@ def serialize_comment(jcomment, parent=NOPARENT):
     date = datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
     from_id = jcomment.get('from_id')
     from_link = compose_url_from_id(from_id)
-    comment_link = compose_comment_url_from_id(jcomment['id'])
+    comment_link = f"{VK_BASE_URL}/wall{jcomment['owner_id']}_{jcomment['post_id']}?reply={jcomment['id']}"
     likes_count = jcomment.get('likes').get('count')
     parent = parent
 
@@ -141,16 +148,8 @@ def compose_url_from_id(id):
     url_base = 'https://vk.com/id'
     return url_base + str(id)
 
-def compose_comment_url_from_id(id):
-    # raise NotImplementedError
-    pass
-
-def extract_id_from_url(url):
-    match = re.search(r'https://vk.com/id\d+', url)
-    if not match:
-        return ''
-    id_str = match.group().replace('https://vk.com/id', '')
-    return id_str              
+def compose_comment_url_from_id(base_url, id):
+    return f"{base_url}_r{id}"      
             
 
 def extract_post_id(url):

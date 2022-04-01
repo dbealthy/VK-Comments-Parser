@@ -41,11 +41,14 @@ class DataBase:
         self.cursor.execute(sql, params or ())
         return self.fetchall()
 
+    def get_posts(self):
+        return self.query('SELECT * FROM posts')
 
-    def save_comments(self, comments: list):
-        # params = [(com["P_ID"], com["comment_id"], com["author_name"], com["comment_text"], com["comment_date"], com["replies_to_id"]) for com in comments]
-        sql_insert = "INSERT INTO `comments` (P_ID, comment_id, author_link, comment_text, comment_date, parent) VALUES (%s, %s, %s, %s, %s, %s)"
-        self._cursor.executemany(sql_insert, comments)
+
+    def save_comments(self, comments):
+        params = [(com["p_id"], com["a_id"], com["id"], com["from_link"], com["comment_link"], com["text"], com["likes"], com["date"], com["parent"]) for com in comments]
+        sql_insert = "INSERT INTO `comments` (P_ID, A_ID, comment_id, author_link, comment_link, comment_text, likes, comment_date, parent) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        self._cursor.executemany(sql_insert, params)
         self.commit()
 
     def save_authors(self, authors):
@@ -62,7 +65,13 @@ class DataBase:
         sql_insert = "INSERT INTO `authors` (user_id, link, screen_name, first_name, last_name, bdate, sex, location, photo_link) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
         ids = self._cursor.executemany(sql_insert, params)
         self.commit()
-        return ids
+
 
     def get_author(self, author_id):
         return self.quiery("SELECT AUTHOR_ID FROM authors WHERE user_id=%s", author_id)
+
+    def get_author_ids(self, author_ids):
+        return self.query('SELECT `AUTHOR_ID`, `user_id` FROM `authors` WHERE LOCATE(user_id, %s) > 0', author_ids)
+
+    def get_author_user_ids(self, author_ids):
+        return self.query('SELECT `user_id` FROM `authors` WHERE LOCATE(user_id, %s) > 0', author_ids)
