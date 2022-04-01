@@ -42,13 +42,27 @@ class DataBase:
         return self.fetchall()
 
 
-    # def save_items(self, items):
-    #     if items:
-    #         params = [tuple(item.values()) for item in items]
-    #         sql_insert = "INSERT IGNORE INTO `items` (res_id, link, title, content, nd_date, s_date, not_date) VALUES (%s, %s, %s, %s, %s, UNIX_TIMESTAMP(CURRENT_TIMESTAMP), %s)"
-    #         self._cursor.executemany(sql_insert, params)
-    #         self.commit()
+    def save_comments(self, comments: list):
+        # params = [(com["P_ID"], com["comment_id"], com["author_name"], com["comment_text"], com["comment_date"], com["replies_to_id"]) for com in comments]
+        sql_insert = "INSERT INTO `comments` (P_ID, comment_id, author_link, comment_text, comment_date, parent) VALUES (%s, %s, %s, %s, %s, %s)"
+        self._cursor.executemany(sql_insert, comments)
+        self.commit()
 
-    def save_comments(self, comments):
-        pass
-        
+    def save_authors(self, authors):
+        params =  [(auth['user_id'], 
+                    auth['link'], 
+                    auth['screen_name'], 
+                    auth['first_name'], 
+                    auth['last_name'], 
+                    auth['bdate'],
+                    auth['sex'],
+                    auth['location'],
+                    auth['photo_link'])for auth in authors]
+                    
+        sql_insert = "INSERT INTO `authors` (user_id, link, screen_name, first_name, last_name, bdate, sex, location, photo_link) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        ids = self._cursor.executemany(sql_insert, params)
+        self.commit()
+        return ids
+
+    def get_author(self, author_id):
+        return self.quiery("SELECT AUTHOR_ID FROM authors WHERE user_id=%s", author_id)
