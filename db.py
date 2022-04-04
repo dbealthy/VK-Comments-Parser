@@ -1,4 +1,7 @@
+from xxlimited import Str
 import mysql.connector
+from typing import List
+from classes import *
 
 
 class DataBase:
@@ -41,37 +44,36 @@ class DataBase:
         self.cursor.execute(sql, params or ())
         return self.fetchall()
 
-    def get_posts(self):
+    def get_posts(self) -> List[List]:
         return self.query('SELECT * FROM posts')
 
 
-    def save_comments(self, comments):
-        params = [(com["p_id"], com["a_id"], com["id"], com["from_link"], com["comment_link"], com["text"], com["likes"], com["date"], com["parent"]) for com in comments]
+    def save_comments(self, comments: List[Comment]) -> None:
+        print(comments)
+        params = [comment.values() for comment in comments]
+
         sql_insert = "INSERT INTO `comments` (P_ID, A_ID, comment_id, author_link, comment_link, comment_text, likes, comment_date, parent) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
         self._cursor.executemany(sql_insert, params)
         self.commit()
+    
 
-    def save_authors(self, authors):
-        params =  [(auth['user_id'], 
-                    auth['link'], 
-                    auth['screen_name'], 
-                    auth['first_name'], 
-                    auth['last_name'], 
-                    auth['bdate'],
-                    auth['sex'],
-                    auth['location'],
-                    auth['photo_link'])for auth in authors]
+    def save_authors(self, authors: List[Author]) -> None:
+        params =  [auth.values() for auth in authors]
                     
-        sql_insert = "INSERT INTO `authors` (user_id, link, screen_name, first_name, last_name, bdate, sex, location, photo_link) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        sql_insert = "INSERT INTO `authors` (user_id, link, screen_name, name, bdate, sex, location, photo_link) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
         ids = self._cursor.executemany(sql_insert, params)
         self.commit()
 
 
-    def get_author(self, author_id):
+    def get_author(self, author_id: int) -> List:
         return self.quiery("SELECT AUTHOR_ID FROM authors WHERE user_id=%s", author_id)
 
-    def get_author_ids(self, author_ids):
-        return self.query('SELECT `AUTHOR_ID`, `user_id` FROM `authors` WHERE LOCATE(user_id, %s) > 0', author_ids)
+    def get_author_ids(self, author_ids: str) -> List[List]:
+        if not author_ids:
+            return list()
+        return self.query('SELECT `AUTHOR_ID`, `user_id` FROM `authors` WHERE LOCATE(user_id, %s) > 0', (author_ids,))
 
-    def get_author_user_ids(self, author_ids):
-        return self.query('SELECT `user_id` FROM `authors` WHERE LOCATE(user_id, %s) > 0', author_ids)
+    def get_author_user_ids(self, user_ids: str) -> List[List]:
+        if not user_ids:
+            return list()
+        return self.query('SELECT `user_id` FROM `authors` WHERE LOCATE(user_id, %s) > 0', (user_ids,))
