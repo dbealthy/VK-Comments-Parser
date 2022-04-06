@@ -1,20 +1,20 @@
-from datetime import datetime
-from sqlite3 import Timestamp
-import dateparser
-from typing import Iterable, List
-import vk_api
 import re
+import warnings
+from datetime import datetime
+from typing import Iterable, List
 
-from config import dbconfig, login, password
+import dateparser
+import vk_api
+
 from classes import *
+from config import dbconfig, login, password
 from db import DataBase
 
-
 NOPARENT = None
-INSERTION_COUNT = 50
 VK_BASE_URL = "https://vk.com"
 
-def main():
+
+def main() -> None:
     global tools, vk
     vk_session = vk_api.VkApi(login, password)
     vk = vk_session.get_api()
@@ -26,18 +26,21 @@ def main():
         print(error_msg)
         return
 
+    # ignore warning from dateparser library
+    warnings.filterwarnings(
+        "ignore",
+        message="The localize method is no longer necessary, as this time zone supports the fold attribute",
+    )
     with DataBase(dbconfig) as db:
         posts = db.get_posts()
         for post in posts:
             p_id, p_url = post
             owner_id, post_id = extract_post_id(p_url)
-            existing_comments = [c[3] for c in db.query('SELECT * FROM comments WHERE P_ID=%s', (p_id,))]
-            
+            existing_comments = [c[3] for c in db.get_comments_byid(p_id)]
             print(f"Parsing: {p_url}")
-
             for chunk in get_all_chunked_comments(owner_id, post_id):
                 # Remove empty comments and that already exist in database
-                chunk = [comment for comment in chunk if comment and comment.id not in existing_comments]
+                chunk = set([comment for comment in chunk if comment and comment.id not in existing_comments])
 
                 # Extract author ids from comments
                 met_author_ids = set(comment.user_id for comment in chunk)
@@ -45,41 +48,34 @@ def main():
 
                 # Get author ids that are in database 
                 existing_author_ids = set(comment[0] for comment in db.get_author_user_ids(met_author_ids_str))
+                
                 # Get author ids that are not in database yet by finding difference of two sets
                 new_author_user_ids = met_author_ids - existing_author_ids
                     
-
                 # Save new authors to database
                 if new_author_user_ids:
                     new_authors = get_authors_info(new_author_user_ids)
                     db.save_authors(new_authors)
-                    met_author_ids.clear()
 
                 # Ask primary keys of saved authors in database
                 author_primary_keys = db.get_author_ids(met_author_ids_str)
-                print(author_primary_keys)
                 # Insert authors' primary keys to comment objects before inserting them innto database
                 for comment in chunk:
-                    print(comment.user_id)
-                    print()
-                    print([a for a in author_primary_keys if a[1] == comment.user_id])
                     comment.author_id = [a for a in author_primary_keys if a[1] == comment.user_id][0][0]
-                    comment.post_id = p_id
-                    # print(comment)
-                   
+                    comment.post_id = p_id           
 
-                        
                 db.save_comments(chunk)
 
 
+
 def get_authors_info(author_ids: Iterable) -> List[Author]:
-    user_ids = set() 
-    group_ids = set()
+    user_ids = [] 
+    group_ids = []
     for id in author_ids:
         if id >= 0:
-            user_ids.add(id)
+            user_ids.append(id)
         else:
-            group_ids.add(id * -1)
+            group_ids.append(id * -1)
     user_ids = ','.join(map(str, user_ids))
     group_ids = ','.join(map(str, group_ids))
 
@@ -98,14 +94,12 @@ def get_groups_info(ids: str) -> List[Author]:
     fields = "name,screen_name,country,city,start_date,photo_max_orig"
     if not ids:
         return list()
-    print(ids)
     groups = vk.groups.getById(group_ids=ids, fields=fields)
-    print(groups)
     return [serialize_agroup(group) for group in groups]
 
 
 def get_all_chunked_comments(owner_id: int, post_id: int, chunk_size=100) -> List[Comment]:
-    comment_chunk = []
+    comment_chunk = list()
     comments = tools.get_all_iter('wall.getComments', 100, {'owner_id': owner_id, 'post_id': post_id, 'thread_items_count': 10, 'need_likes': 1})
     for jcomment in comments:
         if len(comment_chunk) >= chunk_size:
@@ -135,12 +129,13 @@ def get_all_chunked_comments(owner_id: int, post_id: int, chunk_size=100) -> Lis
 
 
 def serialize_agroup(jauthor: dict) -> Author:
-    id = jauthor['id']*-1
-    link = compose_url_from_id(id)
+    id = jauthor['id']*-1  # Multiply by -1 because database stores groups with minuses and users as postitive int
     name = jauthor.get('name')
     screen_name = jauthor['screen_name']
+    link = compose_url_from_screen_name(screen_name)
     sex = None
-    bdate = parse_start_date(jauthor['start_date']) if jauthor.get('start_date') else None
+    bdate = dateparser.parse(jauthor['bdate']) if jauthor.get('bdate') else None
+    # bdate = parse_start_date(jauthor['start_date']) if jauthor.get('start_date') else None
     country = jauthor['country']['title'] if jauthor.get('country') else None
     city = jauthor['city']['title'] if jauthor.get('city') else None
     location = concatinate(country, city)
@@ -151,11 +146,12 @@ def serialize_agroup(jauthor: dict) -> Author:
 
 def serialize_auser(jauthor: dict) -> Author:
     id = jauthor['id']
-    link = compose_url_from_id(id)
     name = concatinate(jauthor['first_name'], jauthor['last_name'])
     screen_name = jauthor.get('screen_name', " ")
+    link = compose_url_from_screen_name(screen_name)
     sex = parse_gender(jauthor['sex'])
-    bdate = parse_birthday(jauthor.get('bdate'))
+    # bdate = parse_birthday(jauthor.get('bdate'))
+    bdate = dateparser.parse(jauthor['bdate']) if jauthor.get('bdate') else None
     country = jauthor['country']['title'] if jauthor.get('country') else None
     city = jauthor['city']['title'] if jauthor.get('city') else None
     location = concatinate(country, city)
@@ -166,7 +162,7 @@ def serialize_auser(jauthor: dict) -> Author:
 
 def serialize_comment(jcomment: dict, parent_id=NOPARENT) -> Comment:
     # Filter removed comments
-    if jcomment.get('deleted') == True:
+    if jcomment.get('deleted'):
         return None
 
     id = jcomment['id']
@@ -176,7 +172,6 @@ def serialize_comment(jcomment: dict, parent_id=NOPARENT) -> Comment:
     comment_link = f"{VK_BASE_URL}/wall{jcomment['owner_id']}_{jcomment['post_id']}?reply={jcomment['id']}"
     likes_count = jcomment.get('likes')['count']
     timestamp = str(jcomment.get('date'))
-    # date = datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
     date = dateparser.parse(timestamp)
     
     return Comment(id, from_id, None, None, parent_id, author_link, comment_link, likes_count, text, date)
@@ -208,14 +203,14 @@ def parse_birthday(bdate):
         return datetime.strptime(bdate, '%d.%m').strftime('0000-%m-%d')
     
 
-# Returns formated for database date of group creation
-def parse_start_date(crdate):
-    return datetime.strptime(crdate, '%Y%d%m').strftime('%Y-%m-%d')
-
 
 def compose_url_from_id(id):
     url_base = 'https://vk.com/id'
     return url_base + str(id)
+
+def compose_url_from_screen_name(screen_name):
+    url_base = 'https://vk.com/'
+    return url_base + str(screen_name)
 
 
 def compose_comment_url_from_id(base_url, id):
@@ -232,3 +227,4 @@ def extract_post_id(url):
 
 if __name__ == '__main__':
     main()
+    

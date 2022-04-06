@@ -47,9 +47,11 @@ class DataBase:
     def get_posts(self) -> List[List]:
         return self.query('SELECT * FROM posts')
 
+    def get_comments_byid(self, p_id):
+        return self.query('SELECT * FROM comments WHERE P_ID=%s', (p_id,))
+
 
     def save_comments(self, comments: List[Comment]) -> None:
-        print(comments)
         params = [comment.values() for comment in comments]
 
         sql_insert = "INSERT INTO `comments` (P_ID, A_ID, comment_id, author_link, comment_link, comment_text, likes, comment_date, parent) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"

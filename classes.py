@@ -13,6 +13,12 @@ class Comment:
     text: str
     date: str
 
+    def __eq__(self, other):
+        return self.id == other.id
+
+    def __hash__(self):
+        return self.id
+
     def values(self):
         return self.post_id, self.author_id, self.id, self.author_link, self.comment_link, self.text, self.likes, self.date, self.parent_id
     
