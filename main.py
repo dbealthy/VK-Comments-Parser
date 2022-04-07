@@ -14,10 +14,10 @@ from db import DataBase
 
 NOPARENT = None
 VK_BASE_URL = 'https://vk.com'
-LOGS_DIRECTORY = 'logs'
+LOGS_PATH = "/home/user/Scripts/VK-Comments-Parser/logs"
 
-if not os.path.exists(LOGS_DIRECTORY):
-    os.makedirs(LOGS_DIRECTORY)
+if not os.path.exists(LOGS_PATH):
+    os.makedirs(LOGS_PATH)
 logging.basicConfig(filename='logs/main.log', filemode='w', level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
 
