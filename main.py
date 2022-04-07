@@ -18,7 +18,9 @@ LOGS_PATH = "/home/user/Scripts/VK-Comments-Parser/logs"
 
 if not os.path.exists(LOGS_PATH):
     os.makedirs(LOGS_PATH)
-logging.basicConfig(filename='logs/main.log', filemode='w', level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
+
+logfilename = os.path.join(LOGS_PATH, 'main.log')
+logging.basicConfig(filename=logfilename, filemode='w', level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
 
 def main() -> None:
