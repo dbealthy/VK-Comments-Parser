@@ -1,5 +1,6 @@
-# Test git
 import re
+import os
+import logging
 import warnings
 from datetime import datetime
 from typing import Iterable, List
@@ -12,7 +13,12 @@ from config import dbconfig, login, password
 from db import DataBase
 
 NOPARENT = None
-VK_BASE_URL = "https://vk.com"
+VK_BASE_URL = 'https://vk.com'
+LOGS_DIRECTORY = 'logs'
+
+if not os.path.exists(LOGS_DIRECTORY):
+    os.makedirs(LOGS_DIRECTORY)
+logging.basicConfig(filename='logs/main.log', filemode='w', level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
 
 def main() -> None:
@@ -24,7 +30,7 @@ def main() -> None:
     try:
         vk_session.auth(token_only=True)
     except vk_api.AuthError as error_msg:
-        print(error_msg)
+        logging.exception("Failed to login")
         return
 
     # ignore warning from dateparser library
@@ -32,13 +38,14 @@ def main() -> None:
         "ignore",
         message="The localize method is no longer necessary, as this time zone supports the fold attribute",
     )
+
     with DataBase(dbconfig) as db:
         posts = db.get_posts()
         for post in posts:
             p_id, p_url = post
             owner_id, post_id = extract_post_id(p_url)
             existing_comments = [c[3] for c in db.get_comments_byid(p_id)]
-            print(f"Parsing: {p_url}")
+            logging.info(f"Parsing: {p_url}")
             for chunk in get_all_chunked_comments(owner_id, post_id):
                 # Remove empty comments and that already exist in database
                 chunk = set([comment for comment in chunk if comment and comment.id not in existing_comments])

@@ -1,4 +1,3 @@
-from xxlimited import Str
 import mysql.connector
 from typing import List
 from classes import *

@@ -2,6 +2,5 @@ auth_token.txt
 config.py
 vk_config.v2.json
 __pycache__/
-comments.py
-musiccollector.py
+logs/
 
