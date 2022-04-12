@@ -17,11 +17,11 @@ NOPARENT = None
 VK_BASE_URL = 'https://vk.com'
 LOGS_PATH = "/home/user/Scripts/VK-Comments-Parser/logs"
 
-if not os.path.exists(LOGS_PATH):
-    os.makedirs(LOGS_PATH)
+# if not os.path.exists(LOGS_PATH):
+#     os.makedirs(LOGS_PATH)
     
-with open("test.txt" 'w') as file:
-    file.write("Python script is executed!")
+# with open("test.txt" 'w') as file:
+#     file.write("Python script is executed!")
 
 
 
