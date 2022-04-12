@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from xmlrpc.client import DateTime
 
 @dataclass
 class Comment:
@@ -36,3 +37,9 @@ class Author:
 
     def values(self):
         return self.id, self.link, self.screen_name, self.name, self.bdate, self.sex, self.location, self.photo_link
+
+@dataclass
+class PostLog:
+    p_id: int
+    count_commnets: int
+    message: str

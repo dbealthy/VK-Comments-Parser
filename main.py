@@ -1,3 +1,4 @@
+import chunk
 import re
 import os
 import logging
@@ -16,11 +17,11 @@ NOPARENT = None
 VK_BASE_URL = 'https://vk.com'
 LOGS_PATH = "/home/user/Scripts/VK-Comments-Parser/logs"
 
-if not os.path.exists(LOGS_PATH):
-    os.makedirs(LOGS_PATH)
+# if not os.path.exists(LOGS_PATH):
+#     os.makedirs(LOGS_PATH)
 
-logfilename = os.path.join(LOGS_PATH, 'main.log')
-logging.basicConfig(filename=logfilename, filemode='w', level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
+# logfilename = os.path.join(LOGS_PATH, 'main.log')
+# logging.basicConfig(filename=logfilename, filemode='w', level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
 
 def main() -> None:
@@ -47,35 +48,55 @@ def main() -> None:
             p_id, p_url = post
             owner_id, post_id = extract_post_id(p_url)
             existing_comments = [c[3] for c in db.get_comments_byid(p_id)]
-            logging.info(f"Parsing: {p_url}")
-            for chunk in get_all_chunked_comments(owner_id, post_id):
-                # Remove empty comments and that already exist in database
-                chunk = set([comment for comment in chunk if comment and comment.id not in existing_comments])
+            message = ""
+            post_count = 0
+            print(f"Parsing: {p_url}")
+           
+            if exists_post(owner_id, post_id):
+                chunked_comments = get_comments_bypostid(owner_id, post_id)
+            else:
+                chunked_comments = get_comments_bycommentid(owner_id, post_id)
+            try:
+                for chunk in chunked_comments:
+                    # Remove empty comments and that already exist in database
+                    chunk = set([comment for comment in chunk if comment and comment.id not in existing_comments])
 
-                # Extract author ids from comments
-                met_author_ids = set(comment.user_id for comment in chunk)
-                met_author_ids_str = ','.join(map(str, met_author_ids))
+                    # Extract author ids from comments
+                    met_author_ids = set(comment.user_id for comment in chunk)
+                    met_author_ids_str = ','.join(map(str, met_author_ids))
 
-                # Get author ids that are in database 
-                existing_author_ids = set(comment[0] for comment in db.get_author_user_ids(met_author_ids_str))
-                
-                # Get author ids that are not in database yet by finding difference of two sets
-                new_author_user_ids = met_author_ids - existing_author_ids
+                    # Get author ids that are in database 
+                    existing_author_ids = set(comment[0] for comment in db.get_author_user_ids(met_author_ids_str))
                     
-                # Save new authors to database
-                if new_author_user_ids:
-                    new_authors = get_authors_info(new_author_user_ids)
-                    db.save_authors(new_authors)
+                    # Get author ids that are not in database yet by finding difference of two sets
+                    new_author_user_ids = met_author_ids - existing_author_ids
+                        
+                    # Save new authors to database
+                    if new_author_user_ids:
+                        new_authors = get_authors_info(new_author_user_ids)
+                        db.save_authors(new_authors)
 
-                # Ask primary keys of saved authors in database
-                author_primary_keys = db.get_author_ids(met_author_ids_str)
-                # Insert authors' primary keys to comment objects before inserting them innto database
-                for comment in chunk:
-                    comment.author_id = [a for a in author_primary_keys if a[1] == comment.user_id][0][0]
-                    comment.post_id = p_id           
+                    # Ask primary keys of saved authors in database
+                    author_primary_keys = db.get_author_ids(met_author_ids_str)
+                    # Insert authors' primary keys to comment objects before inserting them innto database
+                    for comment in chunk:
+                        comment.author_id = [a for a in author_primary_keys if a[1] == comment.user_id][0][0]
+                        comment.post_id = p_id           
 
-                db.save_comments(chunk)
+                    db.save_comments(chunk)
+                    post_count += len(chunk)
+                    
+            except vk_api.exceptions.ApiError:
+                message = "Пост не найден или удален"
+            db.save_log(PostLog(p_id, post_count, message))
 
+
+def exists_post(owner_id, post_id):
+    try:
+        vk.wall.getComments(owner_id=owner_id, post_id=post_id, count=1)
+        return True
+    except vk_api.exceptions.ApiError:
+        return False
 
 
 def get_authors_info(author_ids: Iterable) -> List[Author]:
@@ -108,15 +129,29 @@ def get_groups_info(ids: str) -> List[Author]:
     return [serialize_agroup(group) for group in groups]
 
 
-def get_all_chunked_comments(owner_id: int, post_id: int, chunk_size=100) -> List[Comment]:
+def get_comments_bycommentid(owner_id, comment_id, chunk_size=100):
+    comment_chunk = list()
+    parrent_comment = vk.wall.getComment(owner_id=owner_id, comment_id=comment_id)['items'][0]
+    comments = tools.get_all('wall.getComments', 100, {'owner_id': owner_id, 'comment_id': comment_id, 'need_likes': 1})['items']
+    comment_chunk.append(serialize_comment(parrent_comment))
+    for jcomment in comments:
+        if len(comment_chunk) >= chunk_size: 
+            yield comment_chunk
+            comment_chunk.clear()
+        comment_chunk.append(serialize_comment(jcomment))
+    if comment_chunk:
+        yield comment_chunk
+
+
+def get_comments_bypostid(owner_id: int, post_id: int, chunk_size=100) -> List[Comment]:
     comment_chunk = list()
     comments = tools.get_all_iter('wall.getComments', 100, {'owner_id': owner_id, 'post_id': post_id, 'thread_items_count': 10, 'need_likes': 1})
     for jcomment in comments:
         if len(comment_chunk) >= chunk_size:
             yield comment_chunk
             comment_chunk.clear()
-        else:
-            comment_chunk.append(serialize_comment(jcomment))
+
+        comment_chunk.append(serialize_comment(jcomment))
 
         thread = jcomment['thread']
         if not thread:
@@ -131,8 +166,7 @@ def get_all_chunked_comments(owner_id: int, post_id: int, chunk_size=100) -> Lis
             if len(comment_chunk) >= chunk_size:
                 yield comment_chunk
                 comment_chunk.clear()
-            else:
-                comment_chunk.append(serialize_comment(jthread, parent_id=jcomment['id']))
+            comment_chunk.append(serialize_comment(jthread, parent_id=jcomment['id']))
     # if list has less than `chunk_size` elements yield smaller list
     if comment_chunk:
         yield comment_chunk
@@ -237,4 +271,5 @@ def extract_post_id(url):
 
 if __name__ == '__main__':
     main()
+
     
