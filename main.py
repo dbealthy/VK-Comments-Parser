@@ -17,8 +17,13 @@ NOPARENT = None
 VK_BASE_URL = 'https://vk.com'
 LOGS_PATH = "/home/user/Scripts/VK-Comments-Parser/logs"
 
-# if not os.path.exists(LOGS_PATH):
-#     os.makedirs(LOGS_PATH)
+if not os.path.exists(LOGS_PATH):
+    os.makedirs(LOGS_PATH)
+    
+with open("test.txt" 'w') as file:
+    file.write("Python script is executed!")
+
+
 
 # logfilename = os.path.join(LOGS_PATH, 'main.log')
 # logging.basicConfig(filename=logfilename, filemode='w', level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
