@@ -95,6 +95,6 @@ class DataBase:
 
     def save_log(self, log):
         params =  [log.p_id, log.count_commnets, log.message]
-        sql = "INSERT INTO `logs` (p_id, count_commnets, message, last_updated) VALUES (%s, %s, %s, NOW())"
+        sql = "INSERT INTO `logs` (p_id, count_commnets, message, last_updated) VALUES (%s, %s, %s, NOW()) ON DUPLICATE KEY UPDATE count_commnets=count_commnets + VALUES(count_commnets), message=VALUES(message), last_updated=NOW()"
         self.execute(sql, params)
         self.commit()

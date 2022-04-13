@@ -1,4 +1,3 @@
-import chunk
 import re
 import os
 import logging
@@ -15,18 +14,6 @@ from db import DataBase
 
 NOPARENT = None
 VK_BASE_URL = 'https://vk.com'
-LOGS_PATH = "/home/user/Scripts/VK-Comments-Parser/logs"
-
-# if not os.path.exists(LOGS_PATH):
-#     os.makedirs(LOGS_PATH)
-    
-# with open("test.txt" 'w') as file:
-#     file.write("Python script is executed!")
-
-
-
-# logfilename = os.path.join(LOGS_PATH, 'main.log')
-# logging.basicConfig(filename=logfilename, filemode='w', level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
 
 def main() -> None:
@@ -239,18 +226,6 @@ def parse_gender(gend):
     elif gend == 2:
         return 'М'
     return None
-
-
-def parse_birthday(bdate):
-    if not bdate:
-        return None
-    try:
-        # bdate has 01.04.2022 format 
-        return datetime.strptime(bdate, '%d.%m.%Y').strftime('%Y-%m-%d')
-    except:
-        # bdate has 01.04 format 
-        return datetime.strptime(bdate, '%d.%m').strftime('0000-%m-%d')
-    
 
 
 def compose_url_from_id(id):
