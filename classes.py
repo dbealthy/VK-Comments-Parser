@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from xmlrpc.client import DateTime
+import enum
 
 @dataclass
 class Comment:
@@ -41,5 +41,10 @@ class Author:
 @dataclass
 class PostLog:
     p_id: int
-    count_commnets: int
-    message: str
+    count_comments: int
+    status_code: int
+
+class Codes(enum.Enum):
+    Success = 10
+    ParsedFromCommentSuccess = 11
+    PostNotFoundOrDeleted = 20

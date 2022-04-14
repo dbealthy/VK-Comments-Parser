@@ -10,7 +10,7 @@ import vk_api
 
 from classes import *
 from config import dbconfig, login, password
-from db import DataBase
+from db import VkCommentsDB
 
 NOPARENT = None
 VK_BASE_URL = 'https://vk.com'
@@ -34,20 +34,22 @@ def main() -> None:
         message="The localize method is no longer necessary, as this time zone supports the fold attribute",
     )
 
-    with DataBase(dbconfig) as db:
+    with VkCommentsDB(dbconfig) as db:
         posts = db.get_posts()
         for post in posts:
             p_id, p_url = post
             owner_id, post_id = extract_post_id(p_url)
             existing_comments = [c[3] for c in db.get_comments_byid(p_id)]
-            message = ""
+            status_code = None
             post_count = 0
             print(f"Parsing: {p_url}")
            
             if exists_post(owner_id, post_id):
                 chunked_comments = get_comments_bypostid(owner_id, post_id)
+                status_code = Codes.Success
             else:
                 chunked_comments = get_comments_bycommentid(owner_id, post_id)
+                status_code = Codes.ParsedFromCommentSuccess
             try:
                 for chunk in chunked_comments:
                     # Remove empty comments and that already exist in database
@@ -79,11 +81,13 @@ def main() -> None:
                     post_count += len(chunk)
                     
             except vk_api.exceptions.ApiError:
-                message = "Пост не найден или удален"
-            db.save_log(PostLog(p_id, post_count, message))
+                status_code = Codes.PostNotFoundOrDeleted
+            print(status_code)
+            db.save_log(PostLog(p_id, post_count, status_code.value))
+            db.update_service_table(p_id)
 
 
-def exists_post(owner_id, post_id):
+def exists_post(owner_id, post_id) -> bool:
     try:
         vk.wall.getComments(owner_id=owner_id, post_id=post_id, count=1)
         return True

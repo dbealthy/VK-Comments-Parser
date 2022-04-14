@@ -3,7 +3,7 @@ from typing import List
 from classes import *
 
 
-class DataBase:
+class MySqlDataBase:
     def __init__(self, config):
         self._conn = mysql.connector.connect(**config)
         self._cursor = self._conn.cursor()
@@ -53,8 +53,10 @@ class DataBase:
         return self.fetchall()
 
 
+class VkCommentsDB(MySqlDataBase):
     def get_posts(self) -> List[List]:
-        return self.query('SELECT * FROM posts')
+        # gets posts sorted by updated date from service_table
+        return self.query('SELECT p.* FROM `posts` AS p LEFT JOIN `service_table` AS st ON p.POST_ID = st.p_id ORDER BY st.last_update')
 
 
     def get_comments_byid(self, p_id):
@@ -94,7 +96,21 @@ class DataBase:
 
 
     def save_log(self, log):
-        params =  [log.p_id, log.count_commnets, log.message]
-        sql = "INSERT INTO `logs` (p_id, count_commnets, message, last_updated) VALUES (%s, %s, %s, NOW()) ON DUPLICATE KEY UPDATE count_commnets=count_commnets + VALUES(count_commnets), message=VALUES(message), last_updated=NOW()"
+        params =  [log.p_id, log.count_comments, log.status_code]
+        sql = "INSERT INTO `logs` (p_id, count_comments, status_code, log_date) VALUES (%s, %s, %s, NOW())"
         self.execute(sql, params)
         self.commit()
+
+
+    def update_service_table(self, p_id):
+        params = [p_id,]
+        sql = "INSERT INTO `service_table` (p_id, last_update) VALUES (%s, NOW()) ON DUPLICATE KEY UPDATE last_update=NOW()"
+        self.execute(sql, params)
+        self.commit()
+
+
+
+
+
+
+
