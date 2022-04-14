@@ -102,9 +102,9 @@ class VkCommentsDB(MySqlDataBase):
         self.commit()
 
 
-    def update_service_table(self, p_id):
-        params = [p_id,]
-        sql = "INSERT INTO `service_table` (p_id, last_update) VALUES (%s, NOW()) ON DUPLICATE KEY UPDATE last_update=NOW()"
+    def update_service_table(self, p_id, count):
+        params = [p_id, count, count]
+        sql = "INSERT INTO `service_table` (p_id, total_count, last_update) VALUES (%s, %s, NOW()) ON DUPLICATE KEY UPDATE total_count=total_count + %s, last_update=NOW()"
         self.execute(sql, params)
         self.commit()
 

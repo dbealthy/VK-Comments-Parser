@@ -84,7 +84,7 @@ def main() -> None:
                 status_code = Codes.PostNotFoundOrDeleted
             print(status_code)
             db.save_log(PostLog(p_id, post_count, status_code.value))
-            db.update_service_table(p_id)
+            db.update_service_table(p_id, post_count)
 
 
 def exists_post(owner_id, post_id) -> bool:
