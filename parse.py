@@ -1,4 +1,5 @@
 import re
+from shutil import ExecError
 from typing import List
 
 import dateparser, datetime
@@ -11,27 +12,30 @@ class Parser:
 
     @classmethod
     def parse_author(cls, jauthor: dict) -> List:
-        if jauthor.get('type') == 'group':
+        if jauthor.get('type') in ['group', 'page', 'event']:
             return Parser.parse_group(jauthor)
         return Parser.parse_user(jauthor)
 
     
     @classmethod
     def parse_comment(cls, jcomment: dict) -> List:
+        '''If comment is deleted and doesn't have any thread then ingonre it'''
         if jcomment.get('deleted'):
             jcomment = parse_deleted_comment(jcomment)
+            if not jcomment:
+                return
                 
         comment_id = jcomment['id']
         text = jcomment['text']
         from_id = jcomment.get('from_id', 0)
         parent_id = jcomment['parents_stack'][0] if len(jcomment['parents_stack']) else Parser.NOPARENT
-        author_link = compose_url_from_id(from_id) if from_id else ""
         comment_link = f"{Parser.VK_BASE_URL}/wall{jcomment['owner_id']}_{jcomment['post_id']}?reply={jcomment['id']}"
         likes = jcomment.get('likes', {'count': 0}).get('count')
         timestamp = str(jcomment['date'])
         date = dateparser.parse(timestamp)
-        
-        return from_id, comment_id, parent_id, author_link, comment_link, text, likes, date
+    
+        return from_id, comment_id, parent_id, comment_link, text, likes, date
+            
 
 
     @classmethod
@@ -93,6 +97,7 @@ def parse_bdate(bdate):
     elif len(bdate.split('.')) == 2:
         d, m = list(map(int, bdate.split('.')))
         return datetime.datetime(NOYEAR, m, d)
+
 
 def parse_gender(gend):
     genders = {1: 'Ж', 2: 'М'}

@@ -53,10 +53,15 @@ class MySqlDataBase:
 
 
 class VkCommentsDB(MySqlDataBase):
-    def get_posts(self) -> List[List]:
-        # gets posts sorted by updated date from service_table
-        # comments_fromtasks = self.query('SELECT p.* FROM `posts` AS p LEFT JOIN `comments_tasks` AS ct ON p.POST_ID = ct.p_id WHERE ct.status = 0 ORDER BY ct.adate')
-        return self.query('SELECT p.* FROM `posts` AS p LEFT JOIN `service_table` AS st ON p.POST_ID = st.p_id ORDER BY st.last_update')
+    def get_task(self) -> List[List]:
+        
+        return self.query('''
+           SELECT posts.POST_ID, posts.POST_URL FROM `tasks` 
+           INNER JOIN `posts` ON tasks.p_id=posts.POST_ID 
+           WHERE tasks.untill > NOW() AND (DATEDIFF(NOW(), tasks.last_update) >= 1 OR tasks.last_update IS NULL) AND tasks.status != 22 AND tasks.status != 20
+           ORDER BY tasks.last_update
+           LIMIT 1; 
+                          ''')[0]
 
 
     def get_comments_byid(self, p_id):
@@ -67,8 +72,8 @@ class VkCommentsDB(MySqlDataBase):
         p_id = (p_id,)
         params = [p_id + comment for comment in comments]
 
-        sql_insert = "INSERT INTO `comments` (P_ID, A_ID, comment_id, parent_id, author_link, comment_link, comment_text, likes, comment_date, adate) \
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()) ON DUPLICATE KEY UPDATE likes=VALUES(likes)"
+        sql_insert = "INSERT INTO `comments` (P_ID, A_ID, comment_id, parent_id, comment_link, comment_text, likes, comment_date, adate) \
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW()) ON DUPLICATE KEY UPDATE likes=VALUES(likes)"
        
         self._cursor.executemany(sql_insert, params)
         self.commit()
@@ -94,19 +99,10 @@ class VkCommentsDB(MySqlDataBase):
         return self.query('SELECT `user_id` FROM `authors` WHERE LOCATE(user_id, %s) > 0', (user_ids,)) if user_ids else list()
 
 
-    def save_log(self, log):
-        params =  [log.p_id, log.count_comments, log.status_code]
-        sql = "INSERT INTO `logs` (p_id, count_comments, status_code, log_date) VALUES (%s, %s, %s, NOW())"
-        self.execute(sql, params)
-        self.commit()
-
-
-    def update_service_table(self, p_id, count):
-        params = [p_id, count, count]
-        sql = "INSERT INTO `service_table` (p_id, total_count, last_update) VALUES (%s, %s, NOW()) ON DUPLICATE KEY UPDATE total_count=total_count + %s, last_update=NOW()"
-        self.execute(sql, params)
-        self.commit()
-
+    def update_task(self, db_pid, status):
+        
+        self.execute('UPDATE tasks SET status=%s WHERE p_id=%s', (status.value, db_pid))
+        self.execute('UPDATE tasks SET last_update=NOW() WHERE p_id=%s', (db_pid, ))
 
 
 
