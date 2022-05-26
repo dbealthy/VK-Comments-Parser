@@ -8,9 +8,10 @@ def chunk(lst: List, n: int) -> List[List]:
 
 
 class StatusCodes(enum.Enum):
-    InQueue = 0
-    InProcess = 1
-    ParsedFromPost = 10
-    ParsedFromCommentSuccess = 11
-    NotFoundOrDeleted = 20
-    AccessToPostCommentsDenied = 22
+    InQueue = 0                      # Task waits untill it is taken
+    InProcess = 1                    # Task is taken from the table and is being preccsed
+    Failed = 5                       # Program was interrapted somehow (error or keyboard interrapt)
+    ParsedFromPost = 10              # Successfully parsed from a post
+    ParsedFromComment = 11           # Successfully parsed from a comment
+    NotFoundOrDeleted = 20           # Post or comment was not found
+    AccessToPostCommentsDenied = 22  # There is not access to comment section in post/comment

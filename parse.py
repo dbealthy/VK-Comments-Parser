@@ -1,5 +1,4 @@
 import re
-from shutil import ExecError
 from typing import List
 
 import dateparser, datetime

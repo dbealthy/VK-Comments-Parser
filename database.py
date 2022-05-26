@@ -54,14 +54,13 @@ class MySqlDataBase:
 
 class VkCommentsDB(MySqlDataBase):
     def get_task(self) -> List[List]:
-        
         return self.query('''
            SELECT posts.POST_ID, posts.POST_URL FROM `tasks` 
            INNER JOIN `posts` ON tasks.p_id=posts.POST_ID 
-           WHERE tasks.untill > NOW() AND (DATEDIFF(NOW(), tasks.last_update) >= 1 OR tasks.last_update IS NULL) AND tasks.status != 22 AND tasks.status != 20
+           WHERE tasks.untill >= NOW() AND (DATEDIFF(NOW(), tasks.last_update) >= 1 OR tasks.last_update IS NULL) AND tasks.status != 22 AND tasks.status != 20 AND tasks.status != 1
            ORDER BY tasks.last_update
            LIMIT 1; 
-                          ''')[0]
+                          ''')
 
 
     def get_comments_byid(self, p_id):
@@ -100,9 +99,9 @@ class VkCommentsDB(MySqlDataBase):
 
 
     def update_task(self, db_pid, status):
-        
         self.execute('UPDATE tasks SET status=%s WHERE p_id=%s', (status.value, db_pid))
         self.execute('UPDATE tasks SET last_update=NOW() WHERE p_id=%s', (db_pid, ))
+        self.commit()
 
 
 

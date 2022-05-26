@@ -1,6 +1,5 @@
 import asyncio
 import time
-from typing import List
 
 import vkwave
 from vkwave.bots import create_api_session_aiohttp
@@ -10,6 +9,7 @@ from database import VkCommentsDB
 from parse import Parser, extract_post_id
 from tools import StatusCodes
 from vkapi_tools import Fetcher
+import exceptions
 
 api = create_api_session_aiohttp(token=token).api
 api_ctx = api.get_context()
@@ -20,41 +20,44 @@ api_ctx = api.get_context()
 # o_id, p_id = -91050183, 25554036  # Success (40k)
 # o_id, p_id = -91050183, 25427474  # Success (54k) 100mb ram max
 
-# IDEA: somehow organize diverse comment chunks into sized chunks of 25k 
-# When chunk is fully composed its auther_ids are gonna be extracted
-# Return 25000 comments, extract author_ids, make request to get data from ids
-# Save authors, save comments, 
-
-
 async def main():
     disable_dataparser_warnings()
     task = get_task()
-    db_p_id, url = task
 
     while task:
-        o_id, p_id = extract_post_id(url)
-        statuscode = await check_post(api_ctx, o_id, p_id)
-        print(f"Parsing: [{db_p_id}] {url}", end="")
-        print('Status: ', statuscode, end=' | ')
-        match statuscode:
-            case StatusCodes.ParsedFromPost:
-                await handle_post(api_ctx, db_p_id, o_id, p_id)
-            
-            case StatusCodes.ParsedFromCommentSuccess:
-                await handle_comment(api_ctx, db_p_id, o_id, p_id)
-            case _:
-                pass
-        with VkCommentsDB(dbconfig) as db:
-            db.update_task(db_p_id, statuscode)
-        task = get_task()
+        try:
+            db_p_id, url = task
+            o_id, p_id = extract_post_id(url)
+            statuscode = await check_post(api_ctx, o_id, p_id)
+            print(f"Parsing: [{db_p_id}] {url}", end="")
+            print('Status: ', statuscode, end=' | ')
+            match statuscode:
+                case StatusCodes.ParsedFromPost:
+                    await handle_post(api_ctx, db_p_id, o_id, p_id)
+                
+                case StatusCodes.ParsedFromComment:
+                    await handle_comment(api_ctx, db_p_id, o_id, p_id)
+                case _:
+                    pass
+            with VkCommentsDB(dbconfig) as db:
+                db.update_task(db_p_id, statuscode)
+            task = get_task()
+        except:
+            with VkCommentsDB(dbconfig) as db:
+                print(StatusCodes.Failed)
+                db.update_task(db_p_id, StatusCodes.Failed)
+            raise
+        
                 
                 
 def get_task():
     with VkCommentsDB(dbconfig) as db:
         task = db.get_task()
-        db_p_id, url = task
+        if not task:
+            return None
+        db_p_id, url = task[0]
         db.update_task(db_p_id, StatusCodes.InProcess)     
-        return task
+        return task[0]
         
         
 async def handle_comment(api, db_pid, o_id, c_id):
