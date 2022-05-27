@@ -48,7 +48,7 @@ async def main():
                 db.update_task(db_p_id, StatusCodes.Failed)
             raise
     else:
-        print("Все таски сделаны!")        
+        print("All Done. Nothing to do")        
                 
                 
 def get_task():
