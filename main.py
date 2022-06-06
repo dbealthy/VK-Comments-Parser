@@ -9,7 +9,6 @@ from database import VkCommentsDB
 from parse import Parser, extract_post_id
 from tools import StatusCodes
 from vkapi_tools import Fetcher
-import exceptions
 
 api = create_api_session_aiohttp(token=token).api
 api_ctx = api.get_context()

@@ -99,8 +99,7 @@ class VkCommentsDB(MySqlDataBase):
 
 
     def update_task(self, db_pid, status):
-        self.execute('UPDATE tasks SET status=%s WHERE p_id=%s', (status.value, db_pid))
-        self.execute('UPDATE tasks SET last_update=NOW() WHERE p_id=%s', (db_pid, ))
+        self.execute('UPDATE tasks SET status=%s, last_update=NOW() WHERE p_id=%s', (status.value, db_pid))
         self.commit()
 
 
